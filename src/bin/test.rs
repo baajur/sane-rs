@@ -9,6 +9,8 @@ use std::net::TcpStream;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
+type Result<T> = std::result::Result<T, Error>;
+
 // 1.0.3
 const SANE_VERSION: u32 = 0x01000003;
 
@@ -46,30 +48,29 @@ fn init(stream: &mut TcpStream) {
     println!("Received status {}, version {:x}", status, version);
 }
 
-fn request_device_list(stream: &mut TcpStream) -> Vec<Device> {
+fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Option<Device>>> {
     // Send Command
     stream.write_u32::<BigEndian>(1u32).ok();
 
     let status = Status::from(stream.read_u32::<BigEndian>().unwrap());
 
     if status != Status::Success {
-        panic!("Received status {:?}", status);
+        return Err(status.into());
     }
 
     // Read pointer list:
     let size = stream.read_u32::<BigEndian>().unwrap();
 
-    let mut devices = Vec::new();
+    Ok((0..size)
+        .map(|_| {
+            let is_null = stream.read_u32::<BigEndian>().unwrap();
 
-    for i in 0..size {
-        let is_null = stream.read_u32::<BigEndian>().unwrap();
-
-        if is_null == 0 {
-            devices.push(Device::from_stream(stream));
-        }
-    }
-
-    devices
+            match is_null {
+                0 => Some(Device::from_stream(stream)),
+                _ => None,
+            }
+        })
+        .collect())
 }
 
 fn read_string(stream: &mut TcpStream) -> String {
@@ -90,12 +91,15 @@ fn main() {
 
     init(&mut stream);
 
-    let devices = request_device_list(&mut stream);
+    let devices = request_device_list(&mut stream).unwrap();
 
     for device in devices {
-        println!(
-            "{} - {} - {} - {}",
-            device.name, device.vendor, device.model, device.kind
-        );
+        match device {
+            Some(device) => println!(
+                "{} - {} - {} - {}",
+                device.name, device.vendor, device.model, device.kind
+            ),
+            None => println!("NULL"),
+        }
     }
 }
