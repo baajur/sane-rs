@@ -1,4 +1,7 @@
 extern crate byteorder;
+#[macro_use]
+extern crate log;
+extern crate pretty_env_logger;
 extern crate sane;
 
 use sane::status::Status;
@@ -33,6 +36,8 @@ impl Device {
 }
 
 fn init(stream: &mut TcpStream) {
+    info!("Initializing connection");
+
     let _ = stream.write_u32::<BigEndian>(0);
     let _ = stream.write_u32::<BigEndian>(SANE_VERSION);
 
@@ -49,6 +54,8 @@ fn init(stream: &mut TcpStream) {
 }
 
 fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Option<Device>>> {
+    info!("Requesting device list");
+
     // Send Command
     stream.write_u32::<BigEndian>(1u32).ok();
 
@@ -60,6 +67,8 @@ fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Option<Device>>> {
 
     // Read pointer list:
     let size = stream.read_u32::<BigEndian>().unwrap();
+
+    info!("Received array of size {}", size);
 
     Ok((0..size)
         .map(|_| {
@@ -87,6 +96,8 @@ fn read_string(stream: &mut TcpStream) -> String {
 }
 
 fn main() {
+    pretty_env_logger::init();
+
     let mut stream = TcpStream::connect("192.168.1.20:6566").expect("Failed to connect");
 
     init(&mut stream);
