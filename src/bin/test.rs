@@ -71,14 +71,24 @@ fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Option<Device>>> {
     info!("Received array of size {}", size);
 
     Ok((0..size)
-        .map(|_| {
+        .map(|i| {
             let is_null = stream.read_u32::<BigEndian>().unwrap();
+
+            // arrays are null terminated, but it's weird the null is included in the array's length
+            assert!(
+                i != size - 1 || is_null == 0,
+                "Failed assumption of null terminator: {} = ({} - 1) and is_null is {}",
+                i,
+                size,
+                is_null
+            );
 
             match is_null {
                 0 => Some(Device::from_stream(stream)),
                 _ => None,
             }
         })
+        .take(size as usize - 1)
         .collect())
 }
 
