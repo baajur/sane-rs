@@ -1,5 +1,8 @@
 extern crate byteorder;
 
+pub mod error;
+pub mod status;
+
 #[cfg(test)]
 mod tests {
     #[test]
