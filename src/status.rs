@@ -16,8 +16,8 @@ pub enum Status {
     AccessDenied,
 }
 
-impl From<u32> for Status {
-    fn from(val: u32) -> Status {
+impl From<i32> for Status {
+    fn from(val: i32) -> Status {
         match val {
             00 => Status::Success,
             01 => Status::Unsupported,
