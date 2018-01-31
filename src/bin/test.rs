@@ -132,6 +132,20 @@ fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
     }
 }
 
+fn close_device(handle: i32, stream: &mut TcpStream) {
+    info!("Closing device using handle: {}", handle);
+
+    // Send Command
+    stream.write_i32::<BigEndian>(3).ok();
+
+    // Send handle
+    stream.write_i32::<BigEndian>(handle).ok();
+
+    // Receive dummy
+    let dummy = stream.read_i32::<BigEndian>().unwrap();
+    debug!("Received dummy value {}", dummy);
+}
+
 fn read_string(stream: &mut TcpStream) -> Result<Option<String>> {
     let size = stream.read_i32::<BigEndian>().unwrap();
 
@@ -196,7 +210,7 @@ fn main() {
 
     let devices = request_device_list(&mut stream).unwrap();
 
-    devices
+    let device = devices
         .iter()
         .filter(|device| device.is_some())
         .map(|opt| opt.as_ref().unwrap())
@@ -207,15 +221,26 @@ fn main() {
             )
         })
         .take(1)
-        .for_each(|device| {
-            match open_device(&device, &mut stream) {
-                Ok(result) => match result {
-                    OpenResult::Handle(handle) => println!("Received handle {}", handle),
-                    OpenResult::AuthRequired(resource) => {
-                        println!("Received authentication resource {}", resource)
-                    }
-                },
-                Err(e) => error!("{:?}", e),
-            };
-        });
+        .next()
+        .unwrap();
+
+    let handle = match open_device(&device, &mut stream) {
+        Ok(result) => match result {
+            OpenResult::Handle(handle) => {
+                println!("Received handle {}", handle);
+                Some(handle)
+            }
+            OpenResult::AuthRequired(resource) => {
+                println!("Received authentication resource {}", resource);
+                None
+            }
+        },
+        Err(e) => {
+            error!("{:?}", e);
+            None
+        }
+    };
+
+    println!("Closing device {}", &device.name);
+    close_device(handle.unwrap(), &mut stream);
 }
