@@ -66,7 +66,7 @@ fn init(stream: &mut TcpStream) {
     println!("Received status {}, version {:x}", status, version);
 }
 
-fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Option<Device>>> {
+fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
     info!("Requesting device list");
 
     // Send Command
@@ -78,31 +78,8 @@ fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Option<Device>>> {
         return Err(status.into());
     }
 
-    // Read pointer list:
-    let size = stream.read_i32::<BigEndian>().unwrap();
-
-    info!("Received array of size {}", size);
-
-    Ok((0..size)
-        .map(|i| {
-            let is_null = stream.read_i32::<BigEndian>().unwrap();
-
-            // arrays are null terminated, but it's weird the null is included in the array's length
-            assert!(
-                i != size - 1 || is_null != 0,
-                "Failed assumption of null terminator: {} = ({} - 1) and is_null is {}",
-                i,
-                size,
-                is_null
-            );
-
-            match is_null {
-                0 => Some(Device::from_stream(stream)),
-                _ => None,
-            }
-        })
-        .filter(|dev| dev.is_some())
-        .collect())
+    // Read the array of devices
+    Ok(read_array(stream, Device::from_stream))
 }
 
 fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
@@ -200,6 +177,40 @@ where
     Ok(())
 }
 
+fn read_array<F, T>(stream: &mut TcpStream, builder: F) -> Vec<T>
+where
+    F: Fn(&mut TcpStream) -> T,
+{
+    // Read pointer list:
+    let size = stream.read_i32::<BigEndian>().unwrap();
+
+    info!("Received array of size {}", size);
+
+    (0..size)
+        .map(|i| {
+            let is_null = stream.read_i32::<BigEndian>().unwrap();
+
+            // arrays are null terminated, but it's weird the null is included in the array's length
+            assert!(
+                i != size - 1 || is_null != 0,
+                "Failed assumption of null terminator: {} = ({} - 1) and is_null is {}",
+                i,
+                size,
+                is_null
+            );
+
+            match is_null {
+                0 => Some(builder(stream)),
+                _ => None,
+            }
+        })
+        // Discard None ("null") elements in the array
+        .filter(|element| element.is_some())
+        // Unwrap all remaining elements
+        .map(|element| element.unwrap())
+        .collect()
+}
+
 fn main() {
     pretty_env_logger::init();
 
@@ -212,8 +223,6 @@ fn main() {
 
     let device = devices
         .iter()
-        .filter(|device| device.is_some())
-        .map(|opt| opt.as_ref().unwrap())
         .inspect(|device| {
             info!(
                 "{} - {} - {} - {}",
