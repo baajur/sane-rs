@@ -17,6 +17,11 @@ type Result<T> = std::result::Result<T, Error>;
 // 1.0.3
 const SANE_VERSION: u32 = 0x01000003;
 
+/// Trait for types that can be read from a SANE network stream.
+trait FromStream {
+    fn from_stream(string: &mut TcpStream) -> Self;
+}
+
 struct Device {
     name: String,
     vendor: String,
@@ -24,8 +29,8 @@ struct Device {
     kind: String,
 }
 
-impl Device {
-    pub fn from_stream(stream: &mut TcpStream) -> Self {
+impl FromStream for Device {
+    fn from_stream(stream: &mut TcpStream) -> Self {
         Self {
             name: read_string(stream).unwrap().unwrap(),
             vendor: read_string(stream).unwrap().unwrap(),
