@@ -1,3 +1,6 @@
+#![feature(try_trait)]
+#![feature(iterator_try_fold)]
+
 extern crate byteorder;
 #[macro_use]
 extern crate log;
@@ -18,8 +21,10 @@ type Result<T> = std::result::Result<T, Error>;
 const SANE_VERSION: u32 = 0x01000003;
 
 /// Trait for types that can be read from a SANE network stream.
-trait FromStream {
-    fn from_stream(string: &mut TcpStream) -> Self;
+trait TryFromStream {
+    fn try_from_stream(string: &mut TcpStream) -> Result<Self>
+    where
+        Self: std::marker::Sized;
 }
 
 struct Device {
@@ -29,14 +34,14 @@ struct Device {
     kind: String,
 }
 
-impl FromStream for Device {
-    fn from_stream(stream: &mut TcpStream) -> Self {
-        Self {
-            name: read_string(stream).unwrap().unwrap(),
-            vendor: read_string(stream).unwrap().unwrap(),
-            model: read_string(stream).unwrap().unwrap(),
-            kind: read_string(stream).unwrap().unwrap(),
-        }
+impl TryFromStream for Device {
+    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+        Ok(Self {
+            name: read_string(stream)??,
+            vendor: read_string(stream)??,
+            model: read_string(stream)??,
+            kind: read_string(stream)??,
+        })
     }
 }
 
@@ -80,7 +85,7 @@ fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
     check_success_status(stream)?;
 
     // Read the array of devices
-    Ok(read_array(stream, Device::from_stream))
+    read_array(stream, Device::try_from_stream)
 }
 
 fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
@@ -174,9 +179,9 @@ where
     Ok(())
 }
 
-fn read_array<F, T>(stream: &mut TcpStream, builder: F) -> Vec<T>
+fn read_array<F, T>(stream: &mut TcpStream, builder: F) -> Result<Vec<T>>
 where
-    F: Fn(&mut TcpStream) -> T,
+    F: Fn(&mut TcpStream) -> Result<T>,
 {
     // Read pointer list:
     let size = stream.read_i32::<BigEndian>().unwrap();
@@ -196,16 +201,22 @@ where
                 is_null
             );
 
+            debug!("Reading array element...");
+
             match is_null {
-                0 => Some(builder(stream)),
-                _ => None,
+                0 => Ok(Some(builder(stream)?)),
+                _ => Ok(None),
             }
         })
-        // Discard None ("null") elements in the array
-        .filter(|element| element.is_some())
-        // Unwrap all remaining elements
-        .map(|element| element.unwrap())
-        .collect()
+        .try_fold(Vec::new(), |mut arr, element: Result<Option<T>>| {
+            debug!("Folding array element...");
+            // Propagate an Err values up to the outer Result,
+            // and filter out any None elements.
+            if let Some(e) = element? {
+                arr.push(e)
+            }
+            Ok(arr)
+        })
 }
 
 fn read_status(stream: &mut TcpStream) -> Result<Status> {

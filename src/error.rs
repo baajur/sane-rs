@@ -7,6 +7,7 @@ pub enum Error {
     BadNetworkDataError(String),
     FromUtf8Error(::std::string::FromUtf8Error),
     IOError(::std::io::Error),
+    NoneError(::std::option::NoneError),
 }
 
 impl From<Status> for Error {
@@ -24,5 +25,11 @@ impl From<::std::string::FromUtf8Error> for Error {
 impl From<::std::io::Error> for Error {
     fn from(error: ::std::io::Error) -> Error {
         Error::IOError(error)
+    }
+}
+
+impl From<::std::option::NoneError> for Error {
+    fn from(error: ::std::option::NoneError) -> Error {
+        Error::NoneError(error)
     }
 }
