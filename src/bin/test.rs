@@ -57,13 +57,12 @@ fn init(stream: &mut TcpStream) {
 
     write_string("Foobar", stream).ok();
 
-    let status = stream.read_i32::<BigEndian>().unwrap();
-
-    // TODO: Check status
+    // Make sure we received Success status
+    check_success_status(stream).ok();
 
     let version = stream.read_u32::<BigEndian>().unwrap();
 
-    println!("Received status {}, version {:x}", status, version);
+    println!("Connection initiated, version {:x}", version);
 }
 
 fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
@@ -72,11 +71,8 @@ fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
     // Send Command
     stream.write_i32::<BigEndian>(1).ok();
 
-    let status = Status::from(stream.read_i32::<BigEndian>().unwrap());
-
-    if status != Status::Success {
-        return Err(status.into());
-    }
+    // Make sure we received Success status
+    check_success_status(stream)?;
 
     // Read the array of devices
     Ok(read_array(stream, Device::from_stream))
@@ -91,12 +87,8 @@ fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
     // Send name of device to open
     write_string(&device.name, stream)?;
 
-    // Check status response
-    let status = Status::from(stream.read_i32::<BigEndian>().unwrap());
-    if status != Status::Success {
-        debug!("Status code is {:?}", &status);
-        return Err(status.into());
-    }
+    // Make sure we received Success status
+    check_success_status(stream)?;
 
     let handle = stream.read_i32::<BigEndian>().unwrap();
     let resource = read_string(stream)?;
@@ -209,6 +201,19 @@ where
         // Unwrap all remaining elements
         .map(|element| element.unwrap())
         .collect()
+}
+
+fn read_status(stream: &mut TcpStream) -> Result<Status> {
+    Ok(Status::from(stream.read_i32::<BigEndian>()?))
+}
+
+/// Read response status from `stream` and return Err if the status is
+/// any value other than `Status::Success`.
+fn check_success_status(stream: &mut TcpStream) -> Result<()> {
+    match read_status(stream)? {
+        Status::Success => Ok(()),
+        err => Err(err.into()),
+    }
 }
 
 fn main() {
