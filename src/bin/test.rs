@@ -45,6 +45,41 @@ impl TryFromStream for Device {
     }
 }
 
+enum ValueType {
+    Boolean,
+    Integer,
+    Fixed,
+    String,
+    Button,
+    Group,
+}
+
+enum Unit {
+    None,
+    Pixel,
+    Bit,
+    MM,
+    DPI,
+    Percent,
+    Microsecond,
+}
+
+enum Constraint {
+    StringList(Vec<String>),
+    IntegerList(Vec<i32>),
+    Range { min: i32, max: i32, quant: i32 },
+}
+
+struct OptionDescriptor {
+    name: String,
+    title: String,
+    desciption: String,
+    kind: ValueType,
+    unit: Unit,
+    size: i32,
+    cap: i32,
+}
+
 enum OpenResult {
     /// The device was successfully opened and a handle was returned
     Handle(i32),
@@ -124,6 +159,14 @@ fn close_device(handle: i32, stream: &mut TcpStream) {
     let dummy = stream.read_i32::<BigEndian>().unwrap();
     debug!("Received dummy value {}", dummy);
 }
+
+/*
+fn get_option_descriptors(handle: i32, stream: &mut TcpStream) {
+    // Send Command
+    stream.write_i32::<BigEndian>(4).ok();
+
+    read_array(stream, builder)
+}*/
 
 fn read_string(stream: &mut TcpStream) -> Result<Option<String>> {
     let size = stream.read_i32::<BigEndian>().unwrap();
