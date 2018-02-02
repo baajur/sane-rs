@@ -8,7 +8,6 @@ extern crate pretty_env_logger;
 extern crate sane;
 
 use sane::*;
-use sane::types::Device;
 use sane::status::Status;
 use sane::error::Error;
 

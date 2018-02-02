@@ -7,13 +7,14 @@ extern crate log;
 pub mod error;
 pub mod status;
 pub mod types;
+mod device;
 
 use std::io::prelude::*;
 use std::net::TcpStream;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use types::Device;
+pub use device::Device;
 use error::Error;
 use status::Status;
 
