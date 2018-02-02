@@ -70,7 +70,7 @@ pub fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
     check_success_status(stream)?;
 
     // Read the array of devices
-    read_array(stream, Device::try_from_stream)
+    <Vec<Device>>::try_from_stream(stream)
 }
 
 pub fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
@@ -86,7 +86,7 @@ pub fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult
     check_success_status(stream)?;
 
     let handle = stream.read_i32::<BigEndian>().unwrap();
-    let resource = read_string(stream)?;
+    let resource = <Option<String>>::try_from_stream(stream)?;
 
     match resource {
         // If no resource is returned, the device was successfully opened
@@ -119,28 +119,6 @@ fn get_option_descriptors(handle: i32, stream: &mut TcpStream) {
 }
 */
 
-fn read_string(stream: &mut TcpStream) -> Result<Option<String>> {
-    let size = stream.read_i32::<BigEndian>().unwrap();
-
-    if size <= 0 {
-        return Ok(None);
-    }
-
-    String::from_utf8(
-        stream
-            // Read the number of bytes equal to the given size
-            .take(u64::from(size as u32))
-            .bytes()
-            // Stop reading if we encounter an error or a null byte
-            .take_while(|byte| byte.is_ok() && byte.as_ref().unwrap() != &0x00u8)
-            // We're now guaranteed to not have an Err result, so unwrap to just a u8
-            .map(|byte| byte.unwrap())
-            // Collect into a Vec<u8>
-            .collect(),
-    ).map_err(|err| err.into())
-        .map(|s| Some(s)) // Convert our Result<String> into Result<Option<String>>
-}
-
 fn write_string<S>(string: S, stream: &mut TcpStream) -> Result<()>
 where
     S: AsRef<str>,
@@ -171,46 +149,6 @@ where
     stream.write(&vec![0x00u8]);
 
     Ok(())
-}
-
-fn read_array<F, T>(stream: &mut TcpStream, builder: F) -> Result<Vec<T>>
-where
-    F: Fn(&mut TcpStream) -> Result<T>,
-{
-    // Read pointer list:
-    let size = stream.read_i32::<BigEndian>().unwrap();
-
-    info!("Received array of size {}", size);
-
-    (0..size)
-        .map(|i| {
-            let is_null = stream.read_i32::<BigEndian>().unwrap();
-
-            // arrays are null terminated, but it's weird the null is included in the array's length
-            assert!(
-                i != size - 1 || is_null != 0,
-                "Failed assumption of null terminator: {} = ({} - 1) and is_null is {}",
-                i,
-                size,
-                is_null
-            );
-
-            debug!("Reading array element...");
-
-            match is_null {
-                0 => Ok(Some(builder(stream)?)),
-                _ => Ok(None),
-            }
-        })
-        .try_fold(Vec::new(), |mut arr, element: Result<Option<T>>| {
-            debug!("Folding array element...");
-            // Propagate an Err values up to the outer Result,
-            // and filter out any None elements.
-            if let Some(e) = element? {
-                arr.push(e)
-            }
-            Ok(arr)
-        })
 }
 
 fn read_status(stream: &mut TcpStream) -> Result<Status> {
