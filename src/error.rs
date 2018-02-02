@@ -4,6 +4,9 @@ use status::Status;
 #[derive(Debug)]
 pub enum Error {
     SanedError(Status),
+    /// Error for WORD fields that are constrained to a fixed set of possible values,
+    /// such as "type" fields with a value corresponding to a specific type.
+    InvalidSaneFieldValue(String, i32),
     BadNetworkDataError(String),
     FromUtf8Error(::std::string::FromUtf8Error),
     IOError(::std::io::Error),

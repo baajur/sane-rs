@@ -6,6 +6,12 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use TryFromStream;
 use Result;
 
+impl TryFromStream for i32 {
+    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+        stream.read_i32::<BigEndian>().map_err(|e| e.into())
+    }
+}
+
 impl TryFromStream for Option<String> {
     fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
         let size = stream.read_i32::<BigEndian>().unwrap();
