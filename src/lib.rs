@@ -73,7 +73,13 @@ pub fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
     check_success_status(stream)?;
 
     // Read the array of devices
-    <Vec<Device>>::try_from_stream(stream)
+    <Vec<Option<Device>>>::try_from_stream(stream).map(|dev_list| {
+        dev_list.into_iter()
+            // Filter out any None elements
+            .filter(|d| d.is_some())
+            // None elements are gone, so unwrap all values
+            .map(|d| d.unwrap()).collect()
+    })
 }
 
 pub fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
@@ -116,7 +122,7 @@ pub fn close_device(handle: i32, stream: &mut TcpStream) {
 pub fn get_option_descriptors(
     handle: i32,
     stream: &mut TcpStream,
-) -> Result<Vec<OptionDescriptor>> {
+) -> Result<Vec<Option<OptionDescriptor>>> {
     info!("Requesting options for device: {}", handle);
 
     // Send Command
@@ -158,24 +164,6 @@ where
     stream.write(&vec![0x00u8]);
 
     Ok(())
-}
-
-fn read_string_array(stream: &mut TcpStream) -> Result<Vec<String>> {
-    // Read list:
-    let size = stream.read_i32::<BigEndian>().unwrap();
-
-    info!("Received STRING array of size {}", size);
-
-    (0..size)
-        .map(|i| <Option<String>>::try_from_stream(stream))
-        .try_fold(Vec::new(), |mut arr, element: Result<Option<String>>| {
-            // Propagate an Err values up to the outer Result,
-            // and filter out any None elements.
-            if let Some(e) = element? {
-                arr.push(e)
-            }
-            Ok(arr)
-        })
 }
 
 fn read_status(stream: &mut TcpStream) -> Result<Status> {

@@ -42,16 +42,23 @@ impl TryFromStream for Option<String> {
     }
 }
 
-/// Shorthand for unwrap()-ing an Option<String> and just returning Err if None.
-impl TryFromStream for String {
+impl<T> TryFromStream for Option<T>
+where
+    T: TryFromStream,
+{
     fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
-        Ok(<Option<String>>::try_from_stream(stream)??)
+        let is_null = stream.read_i32::<BigEndian>().unwrap();
+
+        match is_null {
+            0 => Ok(Some(T::try_from_stream(stream)?)),
+            _ => Ok(None),
+        }
     }
 }
 
 impl<T> TryFromStream for Vec<T>
 where
-    T: TryFromStream,
+    T: TryFromStream + ::std::fmt::Debug,
 {
     fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
         // Read pointer list:
@@ -60,30 +67,18 @@ where
         info!("Received array of size {}", size);
 
         (0..size)
-            .map(|i| {
-                let is_null = stream.read_i32::<BigEndian>().unwrap();
-
-                // arrays are null terminated, but it's weird the null is included in the array's length
-                assert!(
-                    i != size - 1 || is_null != 0,
-                    "Failed assumption of null terminator: {} = ({} - 1) and is_null is {}",
-                    i,
-                    size,
-                    is_null
-                );
-
-                match is_null {
-                    0 => Ok(Some(T::try_from_stream(stream)?)),
-                    _ => Ok(None),
-                }
-            })
-            .try_fold(Vec::new(), |mut arr, element: Result<Option<T>>| {
+            .map(|i| T::try_from_stream(stream))
+            .try_fold(Vec::new(), |mut arr, element| {
                 // Propagate an Err values up to the outer Result,
-                // and filter out any None elements.
-                if let Some(e) = element? {
-                    arr.push(e)
-                }
+                debug!("Folding element: {:?}", element);
+                arr.push(element?);
                 Ok(arr)
+            })
+            .map(|mut vec| {
+                // Remove the trailing empty value
+                debug!("Dropping trailing null value from vec: {:?}", vec.last());
+                vec.truncate((size - 1) as usize);
+                vec
             })
     }
 }

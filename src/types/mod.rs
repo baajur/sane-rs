@@ -106,7 +106,13 @@ impl TryFromStream for Option<StringListConstraint> {
         match i32::try_from_stream(stream)? {
             0 => Ok(None), // There is no constraint
             3 => {
-                let opts = ::read_string_array(stream)?;
+                let opts = <Vec<Option<String>>>::try_from_stream(stream).map(|str_list| {
+                    str_list.into_iter()
+                        // Filter out any None strings
+                        .filter(|s| s.is_some())
+                        // None Strings are gone, so unwrap all values
+                        .map(|s| s.unwrap()).collect()
+                })?;
                 debug!("String constraint options: {:?}", opts);
                 Ok(Some(StringListConstraint(opts)))
             }
