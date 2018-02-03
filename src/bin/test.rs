@@ -55,6 +55,14 @@ fn main() {
         }
     };
 
+    let options = match get_option_descriptors(handle.unwrap(), &mut stream) {
+        Ok(options) => options,
+        Err(e) => {
+            error!("{:?}", e);
+            panic!();
+        }
+    };
+
     println!("Closing device {}", &device.name);
     close_device(handle.unwrap(), &mut stream);
 }

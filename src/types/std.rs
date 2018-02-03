@@ -12,6 +12,12 @@ impl TryFromStream for i32 {
     }
 }
 
+impl TryFromStream for u32 {
+    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+        stream.read_u32::<BigEndian>().map_err(|e| e.into())
+    }
+}
+
 impl TryFromStream for Option<String> {
     fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
         let size = stream.read_i32::<BigEndian>().unwrap();
@@ -66,15 +72,12 @@ where
                     is_null
                 );
 
-                debug!("Reading array element...");
-
                 match is_null {
                     0 => Ok(Some(T::try_from_stream(stream)?)),
                     _ => Ok(None),
                 }
             })
             .try_fold(Vec::new(), |mut arr, element: Result<Option<T>>| {
-                debug!("Folding array element...");
                 // Propagate an Err values up to the outer Result,
                 // and filter out any None elements.
                 if let Some(e) = element? {

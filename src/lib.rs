@@ -1,5 +1,7 @@
 #![feature(try_trait)]
 #![feature(iterator_try_fold)]
+#[macro_use]
+extern crate bitflags;
 extern crate byteorder;
 #[macro_use]
 extern crate log;
@@ -17,6 +19,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 pub use device::Device;
 use error::Error;
 use status::Status;
+use types::*;
 
 pub type Result<T> = std::result::Result<T, error::Error>;
 
@@ -110,14 +113,20 @@ pub fn close_device(handle: i32, stream: &mut TcpStream) {
     debug!("Received dummy value {}", dummy);
 }
 
-/*
-fn get_option_descriptors(handle: i32, stream: &mut TcpStream) {
+pub fn get_option_descriptors(
+    handle: i32,
+    stream: &mut TcpStream,
+) -> Result<Vec<OptionDescriptor>> {
+    info!("Requesting options for device: {}", handle);
+
     // Send Command
     stream.write_i32::<BigEndian>(4).ok();
 
-    read_array(stream, builder)
+    // Send handle
+    stream.write_i32::<BigEndian>(handle).ok();
+
+    <_>::try_from_stream(stream)
 }
-*/
 
 fn write_string<S>(string: S, stream: &mut TcpStream) -> Result<()>
 where
@@ -149,6 +158,24 @@ where
     stream.write(&vec![0x00u8]);
 
     Ok(())
+}
+
+fn read_string_array(stream: &mut TcpStream) -> Result<Vec<String>> {
+    // Read list:
+    let size = stream.read_i32::<BigEndian>().unwrap();
+
+    info!("Received STRING array of size {}", size);
+
+    (0..size)
+        .map(|i| <Option<String>>::try_from_stream(stream))
+        .try_fold(Vec::new(), |mut arr, element: Result<Option<String>>| {
+            // Propagate an Err values up to the outer Result,
+            // and filter out any None elements.
+            if let Some(e) = element? {
+                arr.push(e)
+            }
+            Ok(arr)
+        })
 }
 
 fn read_status(stream: &mut TcpStream) -> Result<Status> {
