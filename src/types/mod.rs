@@ -97,7 +97,24 @@ pub struct StringListConstraint(Vec<String>);
 #[derive(Debug)]
 pub enum NumericalConstraint {
     IntegerList(Vec<i32>),
-    Range { min: i32, max: i32, quant: i32 },
+    Range(Option<Range>),
+}
+
+#[derive(Debug)]
+pub struct Range {
+    min: i32,
+    max: i32,
+    quant: i32,
+}
+
+impl TryFromStream for Range {
+    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+        Ok(Range {
+            min: i32::try_from_stream(stream)?,
+            max: i32::try_from_stream(stream)?,
+            quant: i32::try_from_stream(stream)?,
+        })
+    }
 }
 
 impl TryFromStream for Option<StringListConstraint> {
@@ -129,11 +146,9 @@ impl TryFromStream for Option<NumericalConstraint> {
         // See: http://www.sane-project.org/html/doc011.html#s4.2.9.8
         match i32::try_from_stream(stream)? {
             0 => Ok(None), // There is no constraint
-            1 => Ok(Some(NumericalConstraint::Range {
-                min: i32::try_from_stream(stream)?,
-                max: i32::try_from_stream(stream)?,
-                quant: i32::try_from_stream(stream)?,
-            })),
+            1 => Ok(Some(NumericalConstraint::Range(<_>::try_from_stream(
+                stream,
+            )?))),
             2 => Ok(Some(NumericalConstraint::IntegerList(
                 <_>::try_from_stream(stream)?,
             ))),
