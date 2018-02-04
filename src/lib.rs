@@ -28,7 +28,7 @@ const SANE_VERSION: u32 = 0x01000003;
 
 /// Trait for types that can be read from a SANE network stream.
 trait TryFromStream {
-    fn try_from_stream(string: &mut TcpStream) -> Result<Self>
+    fn try_from_stream<S: Read>(string: &mut S) -> Result<Self>
     where
         Self: std::marker::Sized;
 }

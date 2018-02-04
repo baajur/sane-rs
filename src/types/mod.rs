@@ -1,5 +1,6 @@
 mod std;
 pub use self::std::*;
+use std::io::Read;
 
 use error::Error;
 use {Result, TryFromStream};
@@ -32,7 +33,7 @@ pub enum OptionValueType {
 }
 
 impl TryFromStream for OptionValueType {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         // See: http://www.sane-project.org/html/doc011.html#s4.2.9.4
         match i32::try_from_stream(stream)? {
             0 => Ok(OptionValueType::Boolean),
@@ -70,7 +71,7 @@ pub enum OptionUnit {
 }
 
 impl TryFromStream for OptionUnit {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         // See: http://www.sane-project.org/html/doc011.html#s4.2.9.5
         match i32::try_from_stream(stream)? {
             0 => Ok(OptionUnit::None),
@@ -108,7 +109,7 @@ pub struct Range {
 }
 
 impl TryFromStream for Range {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         Ok(Range {
             min: i32::try_from_stream(stream)?,
             max: i32::try_from_stream(stream)?,
@@ -118,7 +119,7 @@ impl TryFromStream for Range {
 }
 
 impl TryFromStream for Option<StringListConstraint> {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         // See: http://www.sane-project.org/html/doc011.html#s4.2.9.8
         match i32::try_from_stream(stream)? {
             0 => Ok(None), // There is no constraint
@@ -142,7 +143,7 @@ impl TryFromStream for Option<StringListConstraint> {
 }
 
 impl TryFromStream for Option<NumericalConstraint> {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         // See: http://www.sane-project.org/html/doc011.html#s4.2.9.8
         match i32::try_from_stream(stream)? {
             0 => Ok(None), // There is no constraint
@@ -161,7 +162,7 @@ impl TryFromStream for Option<NumericalConstraint> {
 }
 
 impl TryFromStream for NoConstraint {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         // See: http://www.sane-project.org/html/doc011.html#s4.2.9.8
         match i32::try_from_stream(stream)? {
             0 => Ok(NoConstraint), // There is no constraint
@@ -219,7 +220,7 @@ bitflags!{
 }
 
 impl TryFromStream for Capabilities {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         Ok(Capabilities::from_bits_truncate(<u32>::try_from_stream(
             stream,
         )?))
@@ -280,7 +281,7 @@ pub enum OptionDescriptor {
 }
 
 impl TryFromStream for OptionDescriptor {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         let name: Option<String> = <_>::try_from_stream(stream)?;
         let title: Option<String> = <_>::try_from_stream(stream)?;
         let description: Option<String> = <_>::try_from_stream(stream)?;

@@ -7,19 +7,19 @@ use TryFromStream;
 use Result;
 
 impl TryFromStream for i32 {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         stream.read_i32::<BigEndian>().map_err(|e| e.into())
     }
 }
 
 impl TryFromStream for u32 {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         stream.read_u32::<BigEndian>().map_err(|e| e.into())
     }
 }
 
 impl TryFromStream for Option<String> {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         let size = stream.read_i32::<BigEndian>().unwrap();
 
         if size <= 0 {
@@ -46,7 +46,7 @@ impl<T> TryFromStream for Option<T>
 where
     T: TryFromStream,
 {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         let is_null = stream.read_i32::<BigEndian>().unwrap();
 
         match is_null {
@@ -60,7 +60,7 @@ impl<T> TryFromStream for Vec<T>
 where
     T: TryFromStream + ::std::fmt::Debug,
 {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         // Read pointer list:
         let size = stream.read_i32::<BigEndian>().unwrap();
 

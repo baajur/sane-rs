@@ -1,4 +1,4 @@
-use std::net::TcpStream;
+use std::io::Read;
 use TryFromStream;
 use Result;
 
@@ -11,7 +11,7 @@ pub struct Device {
 }
 
 impl TryFromStream for Device {
-    fn try_from_stream(stream: &mut TcpStream) -> Result<Self> {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         Ok(Self {
             name: <Option<String>>::try_from_stream(stream)??,
             vendor: <Option<String>>::try_from_stream(stream)??,
