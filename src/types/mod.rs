@@ -285,13 +285,6 @@ impl TryFromStream for OptionDescriptor {
         let title: Option<String> = <_>::try_from_stream(stream)?;
         let description: Option<String> = <_>::try_from_stream(stream)?;
 
-        debug!("Name: {}", name.as_ref().unwrap_or(&"".into()));
-        debug!("Title: {}", title.as_ref().unwrap_or(&"".into()));
-        debug!(
-            "Description: {}",
-            description.as_ref().unwrap_or(&"".into())
-        );
-
         let kind = OptionValueType::try_from_stream(stream)?;
         let unit = OptionUnit::try_from_stream(stream)?;
         let size = <i32>::try_from_stream(stream)?;
