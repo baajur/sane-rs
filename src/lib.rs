@@ -12,7 +12,6 @@ pub mod types;
 mod device;
 
 use std::io::prelude::*;
-use std::net::TcpStream;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
@@ -44,7 +43,7 @@ pub enum OpenResult {
     AuthRequired(String),
 }
 
-pub fn init(stream: &mut TcpStream) {
+pub fn init<S: Read + Write>(stream: &mut S) {
     info!("Initializing connection");
 
     let _ = stream.write_u32::<BigEndian>(0);
@@ -63,7 +62,7 @@ pub fn init(stream: &mut TcpStream) {
     println!("Connection initiated, version {:x}", version);
 }
 
-pub fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
+pub fn request_device_list<S: Read + Write>(stream: &mut S) -> Result<Vec<Device>> {
     info!("Requesting device list");
 
     // Send Command
@@ -82,7 +81,7 @@ pub fn request_device_list(stream: &mut TcpStream) -> Result<Vec<Device>> {
     })
 }
 
-pub fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult> {
+pub fn open_device<S: Read + Write>(device: &Device, stream: &mut S) -> Result<OpenResult> {
     info!("Opening device '{}'", device.name);
 
     // Send Command
@@ -105,7 +104,7 @@ pub fn open_device(device: &Device, stream: &mut TcpStream) -> Result<OpenResult
     }
 }
 
-pub fn close_device(handle: i32, stream: &mut TcpStream) {
+pub fn close_device<S: Read + Write>(handle: i32, stream: &mut S) {
     info!("Closing device using handle: {}", handle);
 
     // Send Command
@@ -119,9 +118,9 @@ pub fn close_device(handle: i32, stream: &mut TcpStream) {
     debug!("Received dummy value {}", dummy);
 }
 
-pub fn get_option_descriptors(
+pub fn get_option_descriptors<S: Read + Write>(
     handle: i32,
-    stream: &mut TcpStream,
+    stream: &mut S,
 ) -> Result<Vec<Option<OptionDescriptor>>> {
     info!("Requesting options for device: {}", handle);
 
@@ -134,7 +133,7 @@ pub fn get_option_descriptors(
     <_>::try_from_stream(stream)
 }
 
-fn write_string<S>(string: S, stream: &mut TcpStream) -> Result<()>
+fn write_string<S, I: Read + Write>(string: S, stream: &mut I) -> Result<()>
 where
     S: AsRef<str>,
 {
@@ -166,13 +165,13 @@ where
     Ok(())
 }
 
-fn read_status(stream: &mut TcpStream) -> Result<Status> {
+fn read_status<S: Read>(stream: &mut S) -> Result<Status> {
     Ok(Status::from(stream.read_i32::<BigEndian>()?))
 }
 
 /// Read response status from `stream` and return Err if the status is
 /// any value other than `Status::Success`.
-fn check_success_status(stream: &mut TcpStream) -> Result<()> {
+fn check_success_status<S: Read + Write>(stream: &mut S) -> Result<()> {
     match read_status(stream)? {
         Status::Success => Ok(()),
         err => Err(err.into()),

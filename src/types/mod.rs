@@ -4,7 +4,6 @@ use std::io::Read;
 
 use error::Error;
 use {Result, TryFromStream};
-use std::net::TcpStream;
 
 /// The type of an option value, in an OptionDescriptor.
 ///
