@@ -2,6 +2,7 @@
 #![feature(iterator_try_fold)]
 
 extern crate byteorder;
+extern crate dotenv;
 #[macro_use]
 extern crate log;
 extern crate pretty_env_logger;
@@ -13,13 +14,20 @@ use sane::error::Error;
 
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::env;
+use dotenv::dotenv;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 fn main() {
+    dotenv().ok();
     pretty_env_logger::init();
 
-    let mut stream = TcpStream::connect("192.168.1.20:6566").expect("Failed to connect");
+    let server = env::var("SANE_SERVER_ADDRESS").unwrap_or("localhost:6566".into());
+
+    info!("Connecting to SANE server at address {}.", &server);
+
+    let mut stream = TcpStream::connect(server).expect("Failed to connect");
     stream.set_nodelay(true);
 
     init(&mut stream);
