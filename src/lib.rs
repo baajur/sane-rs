@@ -43,6 +43,23 @@ pub enum OpenResult {
     AuthRequired(String),
 }
 
+#[derive(Debug)]
+pub enum ControlAction {
+    Get,
+    Set,
+    SetAutomatic,
+}
+
+impl AsRef<i32> for ControlAction {
+    fn as_ref(&self) -> &i32 {
+        match self {
+            &ControlAction::Get => &0,
+            &ControlAction::Set => &1,
+            &ControlAction::SetAutomatic => &2,
+        }
+    }
+}
+
 pub fn init<S: Read + Write>(stream: &mut S) {
     info!("Initializing connection");
 
@@ -131,6 +148,51 @@ pub fn get_option_descriptors<S: Read + Write>(
     stream.write_i32::<BigEndian>(handle).ok();
 
     <_>::try_from_stream(stream)
+}
+
+pub fn control_option<S: Read + Write, V>(
+    stream: &mut S,
+    handle: i32,
+    option: u32,
+    action: ControlAction,
+    kind: &OptionDescriptor,
+    value: Option<&V>,
+) -> Result<()> {
+    info!("Sending option control request of type {:?}", action);
+
+    // Send Command
+    stream.write_i32::<BigEndian>(5)?;
+
+    stream.write_i32::<BigEndian>(handle)?;
+    stream.write_u32::<BigEndian>(option)?;
+    stream.write_i32::<BigEndian>(*action.as_ref())?;
+    stream.write_i32::<BigEndian>(kind.into())?;
+    stream.write_i32::<BigEndian>(kind.size())?;
+    stream.write_i32::<BigEndian>(0)?; // null option for now
+
+    // Await your reply
+
+    check_success_status(stream)?;
+    let info = i32::try_from_stream(stream)?;
+    let value_type = i32::try_from_stream(stream)?;
+    let value_size = i32::try_from_stream(stream)?;
+    let value = <Option<Vec<u8>>>::try_from_stream(stream)?;
+    let resource = <Option<String>>::try_from_stream(stream)?;
+
+    info!("\t| Info:  {}", info);
+    info!("\t| Type:  {}", value_type);
+    info!("\t| Size:  {}", value_size);
+    info!(
+        "\t| Value: {}",
+        value.map_or("NULL".to_owned(), |bytes| bytes
+            .into_iter()
+            .map(|b| format!("{:02x}", b))
+            .collect(),)
+    );
+
+    info!("\t| Res:   {:?}", resource);
+
+    Ok(())
 }
 
 fn write_string<S, I: Read + Write>(string: S, stream: &mut I) -> Result<()>

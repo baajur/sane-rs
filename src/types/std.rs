@@ -5,6 +5,12 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use TryFromStream;
 use Result;
 
+impl TryFromStream for u8 {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
+        stream.read_u8().map_err(|e| e.into())
+    }
+}
+
 impl TryFromStream for i32 {
     fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         stream.read_i32::<BigEndian>().map_err(|e| e.into())

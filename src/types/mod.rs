@@ -279,6 +279,17 @@ pub enum OptionDescriptor {
     },
 }
 
+impl OptionDescriptor {
+    pub fn size(&self) -> i32 {
+        match self {
+            &OptionDescriptor::Boolean { .. } => 4,
+            &OptionDescriptor::Integer { size, .. } | &OptionDescriptor::Fixed { size, .. } => size,
+            &OptionDescriptor::String { max_length, .. } => max_length,
+            _ => 0,
+        }
+    }
+}
+
 impl TryFromStream for OptionDescriptor {
     fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         let name: Option<String> = <_>::try_from_stream(stream)?;
@@ -345,5 +356,19 @@ impl TryFromStream for OptionDescriptor {
         debug!("{:?}", opt);
 
         opt
+    }
+}
+
+/// Get the serialized type value of the type of the descriptor
+impl<'a> From<&'a OptionDescriptor> for i32 {
+    fn from(o: &'a OptionDescriptor) -> i32 {
+        match o {
+            &OptionDescriptor::Boolean { .. } => 0,
+            &OptionDescriptor::Integer { .. } => 1,
+            &OptionDescriptor::Fixed { .. } => 2,
+            &OptionDescriptor::String { .. } => 3,
+            &OptionDescriptor::Button { .. } => 4,
+            &OptionDescriptor::Group { .. } => 5,
+        }
     }
 }

@@ -71,6 +71,19 @@ fn main() {
         }
     };
 
+    let resolution_opt = options[2].as_ref().unwrap();
+
+    info!("Resolution option: {:?}", resolution_opt);
+
+    control_option::<_, u8>(
+        &mut stream,
+        handle.unwrap(),
+        2,
+        ControlAction::Get,
+        resolution_opt,
+        None,
+    ).ok();
+
     println!("Closing device {}", &device.name);
     close_device(handle.unwrap(), &mut stream);
 }
