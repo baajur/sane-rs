@@ -357,12 +357,16 @@ impl OptionDescriptor {
                 &OptionDescriptor::Integer { .. } => {
                     OptionValue::Integer(i32::try_from_stream(stream)?)
                 }
-                &OptionDescriptor::Fixed { .. } => OptionValue::Fixed(i32::try_from_stream(stream)?),
-                &OptionDescriptor::String { .. } => OptionValue::String(<_>::try_from_stream(stream)?),
+                &OptionDescriptor::Fixed { .. } => {
+                    OptionValue::Fixed(i32::try_from_stream(stream)?)
+                }
+                &OptionDescriptor::String { .. } => {
+                    OptionValue::String(<_>::try_from_stream(stream)?)
+                }
                 &OptionDescriptor::Button { .. } => OptionValue::Button,
                 &OptionDescriptor::Group { .. } => OptionValue::Group,
             }),
-            true => None
+            true => None,
         };
 
         Ok(ControlOptionResult { value, info })
