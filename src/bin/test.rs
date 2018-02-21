@@ -78,7 +78,7 @@ fn main() {
     control_option::<_, u8>(
         &mut stream,
         handle.unwrap(),
-        2,
+        0,
         ControlAction::Get,
         resolution_opt,
         None,

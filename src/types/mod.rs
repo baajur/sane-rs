@@ -5,6 +5,53 @@ use std::io::Read;
 use error::Error;
 use {Result, TryFromStream};
 
+/// I made a different version of Option because the SANE devs are _special_.
+/// Who else would make a protocol where, in some instances, a word with the
+/// value of `1` indicates the subsequent value "is null", while in other
+/// instances, a word with a value of `0` indicidates the pointer value is null?
+pub enum Pointer<T> {
+    Some(T),
+    Null,
+}
+
+impl<T> TryFromStream for Pointer<T>
+where
+    T: TryFromStream,
+{
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
+        let is_null = i32::try_from_stream(stream)?;
+
+        match is_null {
+            0 => Ok(Pointer::Null),
+            _ => Ok(Pointer::Some(T::try_from_stream(stream)?)),
+        }
+    }
+}
+
+impl<T> Pointer<T> {
+    /// Applies a function to the contained value (if any),
+    /// or returns a [`default`][] (if not).
+    ///
+    /// [`default`]: ../default/trait.Default.html#tymethod.default
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let x = Pointer::Some("foo");
+    /// assert_eq!(x.map_or(42, |v| v.len()), 3);
+    ///
+    /// let x: Pointer<&str> = Pointer::Null;
+    /// assert_eq!(x.map_or(42, |v| v.len()), 42);
+    /// ```
+    #[inline]
+    pub fn map_or<U, F: FnOnce(T) -> U>(self, default: U, f: F) -> U {
+        match self {
+            Pointer::Some(t) => f(t),
+            Pointer::Null => default,
+        }
+    }
+}
+
 /// The type of an option value, in an OptionDescriptor.
 ///
 /// See: http://www.sane-project.org/html/doc011.html#s4.2.9.4
@@ -288,6 +335,38 @@ impl OptionDescriptor {
             _ => 0,
         }
     }
+
+    pub fn read_value<S: Read>(&self, stream: &mut S) -> Result<ControlOptionResult> {
+        let info = ControlOptionSetInfo::try_from_stream(stream)?;
+        println!("info is {:?}, Checking value type", info);
+        let value_type = i32::try_from_stream(stream)?;
+        println!("type is {}, checking value size", value_type);
+        let value_size = i32::try_from_stream(stream)?;
+        println!("Value size is {}, reading value", value_size);
+
+        assert_eq!(self.size(), value_size);
+
+        // The value is a pointer, so read if it is null or not.
+        let is_null = u32::try_from_stream(stream)? == 0;
+
+        let value = match is_null {
+            false => Some(match self {
+                &OptionDescriptor::Boolean { .. } => {
+                    OptionValue::Boolean(bool::try_from_stream(stream)?)
+                }
+                &OptionDescriptor::Integer { .. } => {
+                    OptionValue::Integer(i32::try_from_stream(stream)?)
+                }
+                &OptionDescriptor::Fixed { .. } => OptionValue::Fixed(i32::try_from_stream(stream)?),
+                &OptionDescriptor::String { .. } => OptionValue::String(<_>::try_from_stream(stream)?),
+                &OptionDescriptor::Button { .. } => OptionValue::Button,
+                &OptionDescriptor::Group { .. } => OptionValue::Group,
+            }),
+            true => None
+        };
+
+        Ok(ControlOptionResult { value, info })
+    }
 }
 
 impl TryFromStream for OptionDescriptor {
@@ -371,4 +450,57 @@ impl<'a> From<&'a OptionDescriptor> for i32 {
             &OptionDescriptor::Group { .. } => 5,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum OptionValue {
+    Boolean(bool),
+    Integer(i32),
+    Fixed(i32),
+    String(Option<String>),
+    Button,
+    Group,
+}
+
+bitflags!{
+    #[derive(Default)]
+    pub struct ControlOptionSetInfo: u32 {
+        /// The setting of an option value resulted in a value being selected
+        /// that does not exactly match the requested value.
+        ///
+        /// # Example
+        ///
+        /// > For example, if a scanner can adjust the resolution in increments
+        /// > of 30dpi only, setting the resolution to 307dpi may result in an
+        /// > actual setting of 300dpi.
+        const Inexact       = 0x00000001;
+
+        /// > The setting of an option may effect the value or availability of one
+        /// > or more _other_ options. This indicates the application should
+        /// > reload all options.
+        ///
+        /// > This may be set if and only if at least one option changed.
+        const ReloadOptions = 0x00000002;
+
+        /// > The setting of an option may affect the parameter values.
+        ///
+        /// > Note: this may be set even if the parameters did not actually change.
+        /// > However, it is guaranteed that the parameters never change without
+        /// > this value being set.
+        const ReloadParams  = 0x00000004;
+    }
+}
+
+impl TryFromStream for ControlOptionSetInfo {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
+        Ok(ControlOptionSetInfo::from_bits_truncate(
+            <u32>::try_from_stream(stream)?,
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct ControlOptionResult {
+    value: Option<OptionValue>,
+    info: ControlOptionSetInfo,
 }

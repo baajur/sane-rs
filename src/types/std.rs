@@ -5,6 +5,13 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use TryFromStream;
 use Result;
 
+impl TryFromStream for bool {
+    fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
+        // http://www.sane-project.org/html/doc011.html#s4.2.2
+        Ok(stream.read_u32::<BigEndian>()? == 1)
+    }
+}
+
 impl TryFromStream for u8 {
     fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         stream.read_u8().map_err(|e| e.into())

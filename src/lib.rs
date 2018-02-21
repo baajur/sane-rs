@@ -168,28 +168,19 @@ pub fn control_option<S: Read + Write, V>(
     stream.write_i32::<BigEndian>(*action.as_ref())?;
     stream.write_i32::<BigEndian>(kind.into())?;
     stream.write_i32::<BigEndian>(kind.size())?;
-    stream.write_i32::<BigEndian>(0)?; // null option for now
+    stream.write_i32::<BigEndian>(1)?; // null option for now
+    stream.write_i32::<BigEndian>(0)?;
 
     // Await your reply
 
+    println!("checking status");
     check_success_status(stream)?;
-    let info = i32::try_from_stream(stream)?;
-    let value_type = i32::try_from_stream(stream)?;
-    let value_size = i32::try_from_stream(stream)?;
-    let value = <Option<Vec<u8>>>::try_from_stream(stream)?;
+
+    let result = kind.read_value(stream)?;
+
+    info!("Result: {:?}", result);
+
     let resource = <Option<String>>::try_from_stream(stream)?;
-
-    info!("\t| Info:  {}", info);
-    info!("\t| Type:  {}", value_type);
-    info!("\t| Size:  {}", value_size);
-    info!(
-        "\t| Value: {}",
-        value.map_or("NULL".to_owned(), |bytes| bytes
-            .into_iter()
-            .map(|b| format!("{:02x}", b))
-            .collect(),)
-    );
-
     info!("\t| Res:   {:?}", resource);
 
     Ok(())
