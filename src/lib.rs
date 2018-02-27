@@ -278,5 +278,9 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(expected, result.unwrap());
+        assert_eq!(
+            &hex!("00000005 00000000 00000000 00000000 00000001 00000004 00000001 00000000"),
+            stream.pop_bytes_written().as_ref()
+        );
     }
 }
