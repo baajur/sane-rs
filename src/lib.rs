@@ -3,8 +3,13 @@
 #[macro_use]
 extern crate bitflags;
 extern crate byteorder;
+#[cfg(test)]
+#[macro_use]
+extern crate hex_literal;
 #[macro_use]
 extern crate log;
+#[cfg(test)]
+extern crate mockstream;
 
 pub mod error;
 pub mod status;
@@ -157,7 +162,7 @@ pub fn control_option<S: Read + Write, V>(
     action: ControlAction,
     kind: &OptionDescriptor,
     value: Option<&V>,
-) -> Result<()> {
+) -> Result<ControlOptionResult> {
     info!("Sending option control request of type {:?}", action);
 
     // Send Command
@@ -181,9 +186,13 @@ pub fn control_option<S: Read + Write, V>(
     info!("Result: {:?}", result);
 
     let resource = <Option<String>>::try_from_stream(stream)?;
+
+    // TODO Handle the case where a resource is returned
+    assert!(resource.is_none()); // a hacky reminder.
+
     info!("\t| Res:   {:?}", resource);
 
-    Ok(())
+    Ok(result)
 }
 
 fn write_string<S, I: Read + Write>(string: S, stream: &mut I) -> Result<()>
@@ -233,8 +242,41 @@ fn check_success_status<S: Read + Write>(stream: &mut S) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use mockstream::MockStream;
+
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn test_get_option() {
+        // Don't really care about the actual contents here, for now,
+        // since we're just testing how the function reads the stream.
+        let kind = OptionDescriptor::Integer {
+            name: "test".into(),
+            title: "test".into(),
+            description: "test".into(),
+            unit: OptionUnit::None,
+            size: 4,
+            capabilities: Capabilities::default(),
+            constraint: None,
+        };
+
+        let mut stream = MockStream::new();
+        stream.push_bytes_to_read(&hex!(
+            "00000000000000000000000100000004000000010000001900000000"
+        ));
+
+        let result = control_option::<_, u8>(&mut stream, 0, 0, ControlAction::Get, &kind, None);
+
+        let expected = ControlOptionResult {
+            value: Some(OptionValue::Integer(25)),
+            info: ControlOptionSetInfo::default(),
+        };
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
     }
 }

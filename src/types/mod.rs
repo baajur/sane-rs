@@ -37,6 +37,8 @@ impl<T> Pointer<T> {
     /// # Examples
     ///
     /// ```
+    /// use sane::types::Pointer;
+    ///
     /// let x = Pointer::Some("foo");
     /// assert_eq!(x.map_or(42, |v| v.len()), 3);
     ///
@@ -456,7 +458,7 @@ impl<'a> From<&'a OptionDescriptor> for i32 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum OptionValue {
     Boolean(bool),
     Integer(i32),
@@ -503,8 +505,8 @@ impl TryFromStream for ControlOptionSetInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ControlOptionResult {
-    value: Option<OptionValue>,
-    info: ControlOptionSetInfo,
+    pub value: Option<OptionValue>,
+    pub info: ControlOptionSetInfo,
 }
