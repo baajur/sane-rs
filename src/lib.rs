@@ -266,7 +266,7 @@ mod tests {
 
         let mut stream = MockStream::new();
         stream.push_bytes_to_read(&hex!(
-            "00000000000000000000000100000004000000010000001900000000"
+            "00000000 00000000 00000001 00000004 00000001 00000019 00000000"
         ));
 
         let result = control_option::<_, u8>(&mut stream, 0, 0, ControlAction::Get, &kind, None);
@@ -280,7 +280,7 @@ mod tests {
         assert_eq!(expected, result.unwrap());
         assert_eq!(
             &hex!("00000005 00000000 00000000 00000000 00000001 00000004 00000001 00000000"),
-            stream.pop_bytes_written().as_ref()
+            stream.pop_bytes_written().as_slice()
         );
     }
 }
