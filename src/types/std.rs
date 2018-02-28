@@ -94,3 +94,40 @@ where
             })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockstream::MockStream;
+
+    #[test]
+    fn test_read_option_string_vec() {
+        let mut stream = MockStream::new();
+        stream.push_bytes_to_read(&hex!(
+            "0000000400000006436f6c6f7200000000054772617900000000084c696e656172740000000000"
+        ));
+
+        let result = <Vec<Option<String>>>::try_from_stream(&mut stream);
+
+        assert!(result.is_ok());
+        assert_eq!(
+            vec![
+                Some("Color".into()),
+                Some("Gray".into()),
+                Some("Lineart".into()),
+            ],
+            result.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_read_int_vec() {
+        let mut stream = MockStream::new();
+        stream.push_bytes_to_read(&hex!("00000005000000040000004b000000960000012c00000258"));
+
+        let result = <Vec<i32>>::try_from_stream(&mut stream);
+
+        assert!(result.is_ok());
+        assert_eq!(vec![4, 75, 150, 300, 600], result.unwrap());
+    }
+}
