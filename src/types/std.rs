@@ -97,12 +97,10 @@ where
             //
             // It took me _way_ too long to finally understand that instead of being _sane_
             // and just sending a 0x00000000 word, all values are preceeded by their size,
-            // so to send a NULL, we must send a word of value 1 (0x00000001) followed
+            // so to send a NULL we must send a word of value 1 (0x00000001) followed
             // by a 0x00000000 word to indicate the pointer is null.
 
-            //stream.write(&[00, 00, 00, 01, 00, 00, 00, 00])?;
-            stream.write_i32::<BigEndian>(1)?;
-            stream.write_i32::<BigEndian>(0)?;
+            stream.write(&[00, 00, 00, 01, 00, 00, 00, 00])?;
             return Ok(());
         }
 
