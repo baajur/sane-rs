@@ -104,7 +104,7 @@ where
             return Ok(());
         }
 
-        Ok(stream.write_i32::<BigEndian>(0)?)
+        self.as_ref().unwrap().write_to(stream)
     }
 }
 
