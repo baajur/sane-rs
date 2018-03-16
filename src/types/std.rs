@@ -2,7 +2,7 @@ use std::io::prelude::*;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use TryFromStream;
+use {TryFromStream, WriteToStream};
 use Result;
 
 impl TryFromStream for bool {
@@ -18,9 +18,21 @@ impl TryFromStream for u8 {
     }
 }
 
+impl WriteToStream for u8 {
+    fn write_to<S: Write>(&self, stream: &mut S) -> Result<()> {
+        Ok(stream.write_u8(*self)?)
+    }
+}
+
 impl TryFromStream for i32 {
     fn try_from_stream<S: Read>(stream: &mut S) -> Result<Self> {
         stream.read_i32::<BigEndian>().map_err(|e| e.into())
+    }
+}
+
+impl WriteToStream for i32 {
+    fn write_to<S: Write>(&self, stream: &mut S) -> Result<()> {
+        Ok(stream.write_i32::<BigEndian>(*self)?)
     }
 }
 
@@ -65,6 +77,36 @@ where
             0 => Ok(Some(T::try_from_stream(stream)?)),
             _ => Ok(None),
         }
+    }
+}
+
+impl<T> WriteToStream for Option<T>
+where
+    T: WriteToStream,
+{
+    fn write_to<S: Write>(&self, stream: &mut S) -> Result<()> {
+        if self.is_none() {
+            // Welcome to the weird choices of SANE.
+            // Here. we'll learn about null pointers.
+            //
+            // * From section 5.1.1: "...a NULL pointer is encoded as a zero-length array."
+            // * From section 5.1.2: "A pointer is encoded by a word that indicates whether
+            //   the pointer is a NULL-pointer which is then followed by the value that the
+            //   pointer points to (in the case of a non-NULL pointer; in the case of
+            //   a NULL pointer, no bytes are encoded for the pointer value)."
+            //
+            // It took me _way_ too long to finally understand that instead of being _sane_
+            // and just sending a 0x00000000 word, all values are preceeded by their size,
+            // so to send a NULL, we must send a word of value 1 (0x00000001) followed
+            // by a 0x00000000 word to indicate the pointer is null.
+
+            //stream.write(&[00, 00, 00, 01, 00, 00, 00, 00])?;
+            stream.write_i32::<BigEndian>(1)?;
+            stream.write_i32::<BigEndian>(0)?;
+            return Ok(());
+        }
+
+        Ok(stream.write_i32::<BigEndian>(0)?)
     }
 }
 
@@ -129,5 +171,18 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(vec![4, 75, 150, 300, 600], result.unwrap());
+    }
+
+    #[test]
+    fn send_a_none_option() {
+        let mut stream = MockStream::new();
+        let option: Option<i32> = None;
+
+        option.write_to(&mut stream).unwrap();
+
+        assert_eq!(
+            &hex!("00000001 00000000"),
+            stream.pop_bytes_written().as_slice()
+        );
     }
 }

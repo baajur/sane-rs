@@ -37,6 +37,10 @@ trait TryFromStream {
         Self: std::marker::Sized;
 }
 
+pub trait WriteToStream {
+    fn write_to<S: Write>(&self, stream: &mut S) -> Result<()>;
+}
+
 pub enum OpenResult {
     /// The device was successfully opened and a handle was returned
     Handle(i32),
@@ -155,13 +159,13 @@ pub fn get_option_descriptors<S: Read + Write>(
     <_>::try_from_stream(stream)
 }
 
-pub fn control_option<S: Read + Write, V>(
+pub fn control_option<S: Read + Write, V: WriteToStream>(
     stream: &mut S,
     handle: i32,
     option: u32,
     action: ControlAction,
     kind: &OptionDescriptor,
-    value: Option<&V>,
+    value: Option<V>,
 ) -> Result<ControlOptionResult> {
     info!("Sending option control request of type {:?}", action);
 
@@ -173,8 +177,7 @@ pub fn control_option<S: Read + Write, V>(
     stream.write_i32::<BigEndian>(*action.as_ref())?;
     stream.write_i32::<BigEndian>(kind.into())?;
     stream.write_i32::<BigEndian>(kind.size())?;
-    stream.write_i32::<BigEndian>(1)?; // null option for now
-    stream.write_i32::<BigEndian>(0)?;
+    value.write_to(stream)?;
 
     // Await your reply
 
